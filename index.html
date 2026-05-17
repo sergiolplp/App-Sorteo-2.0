@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>App Sorteos</title>
+
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="fmcielo.ico" type="image/x-icon">
+<link rel="apple-touch-icon" href="fmcielo.ico">
+<meta name="theme-color" content="#00eaff">
+
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+
+<style>
+body {
+  margin: 0;
+  font-family: Arial;
+  background: radial-gradient(circle, #000, #111);
+  color: white;
+  text-align: center;
+}
+
+/* NEON */
+.neon { text-shadow: 0 0 5px #00eaff,0 0 10px #00eaff,0 0 20px #00eaff; 
+       font-size: 30px;
+      }
+.neon-pink {
+  color: #ff00c8;
+  text-shadow: 0 0 5px #ff00c8,0 0 10px #ff00c8,0 0 20px #ff00c8;
+   font-size: 30px;
+}
+
+/* BOTONES */
+button {
+  padding: 12px;
+  margin: 6px;
+  border: none;
+  border-radius: 10px;
+  background: #00eaff;
+  color: #ff00c8;
+  font-weight: bold;
+}
+
+/* BANNER */
+.banner {
+  font-size: 80px;
+  color: #ff00c8;
+  text-shadow: 0 0 15px #ff00c8;
+  animation: pulse 1.5s infinite alternate;
+}
+@keyframes pulse { from{transform:scale(1)} to{transform:scale(1.05)} }
+
+/* SLOT */
+.slot {
+  font-size: 60px;
+  width: 80px;
+  height: 90px;
+  background: #111;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  margin: 5px;
+  border-radius: 10px;
+  box-shadow: 0 0 10px #00eaff inset;
+}
+.spin { animation: spin .5s; }
+@keyframes spin {
+  from { transform: translateY(-100px); opacity:0; }
+  to { transform: translateY(0); opacity:1; }
+}
+
+/* GANADOR */
+.win { animation: flash .5s alternate infinite; }
+@keyframes flash {
+  from { background:#001a00 }
+  to { background:#003300 }
+}
+
+#musicBtn {
+  position: fixed;
+  top:10px; right:10px;
+  font-size:22px;
+  background:none;
+  color:white;
+}
+
+  .hidden {
+  display: none;
+}
+
+  .container {
+  padding: 20px;
+  min-height: 100vh;
+}
+
+  button {
+  width: auto;
+}
+
+
+input {
+  padding:12px;
+  border-radius:10px;
+  border:none;
+  text-align:center;
+  font-size:18px;
+}
+
+.resultado-box {
+  margin-top: 20px;
+  padding: 20px;
+  border-radius: 15px;
+  font-size: 28px;
+  font-weight: bold;
+  animation: aparecer 0.5s ease;
+}
+
+.ganador {
+  background: rgba(0,255,100,0.2);
+  color: #00ff88;
+  text-shadow: 0 0 10px #00ff88;
+}
+
+.sin-ganador {
+  background: rgba(255,0,0,0.2);
+  color: #ff4d4d;
+  text-shadow: 0 0 10px #ff4d4d;
+}
+
+@keyframes aparecer {
+  from { opacity: 0; transform: scale(0.8); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+/* POPUP */
+.popup {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0,0,0,0.8);
+
+  display: none;
+
+  justify-content: center;
+  align-items: center;
+
+  z-index: 9999;
+}
+
+.popup:not(.hidden) {
+  display: flex;
+}
+
+.popup-content {
+  background: #111;
+  padding: 20px;
+  border-radius: 15px;
+  width: 90%;
+  max-width: 400px;
+  max-height: 80%;
+  overflow-y: auto;
+  box-shadow: 0 0 20px #00eaff;
+}
+
+.lista {
+  margin: 10px 0;
+  font-size: 18px;
+  line-height: 1.5;
+  text-align: center;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.footer {
+  margin-top: auto;
+  padding: 15px;
+  font-size: 14px;
+  color: #aaa;
+  text-shadow: 0 0 5px #00eaff;
+}
+  
+</style>
+</head>
+
+<body>
+
+  <div id="ayudaPopup" class="popup hidden">
+  <div class="popup-content">
+
+    <h3 class="neon">Funcionamiento de la App</h3>
+
+    <p>
+
+• Los participantes juegan con números de 3 cifras.<br><br>
+
+• Los números pueden cargarse manualmente o importarse desde un archivo Excel.<br><br>
+  El archivo debe llamarse <b>sorteo.xlsx</b> <br><br>
+  Los números deben estar ubicados en la columna A sin título. (Si por ej. el número es 001, podes poner 1).<br><br>
+
+• El sistema acepta números del 000 al 999.<br><br>
+
+• Durante el sorteo se extraen:
+centena, decena y unidad por separado.<br><br>
+
+• La app muestra las posibles combinaciones restantes para centena y unidad.<br><br>
+
+• Si el número sorteado coincide con uno cargado:
+hay uno o varios ganadores.<br><br>
+
+• Si no hay coincidencias, se habilita la opción
+<b>“Sale o sale”</b> para realizar un nuevo intento manteniendo la carga realizada.<br><br>
+
+• También, si no hay coincidencias, puede utilizarse la función
+<b>“Ganador por cercanía”</b>,
+que selecciona el número más cercano al resultado sorteado.<br><br>
+
+• La app permite ver todos los números cargados,
+la cantidad total de participantes y los duplicados detectados.<br><br>
+
+
+    </p>
+
+    <button onclick="cerrarAyuda()">Cerrar</button>
+
+  </div>
+</div>
+
+<button id="musicBtn">🔇</button>
+<audio id="music" loop src="quinelasolicaria.mp3"></audio>
+
+<!-- HOME -->
+<div id="home" class="container">
+  <h1 class="neon-pink">FM Cielo 103.5</h1>
+  <h2 class="neon">Todo no se puede</h2>
+  <button onclick="irCarga()">Nuevo sorteo</button>
+  <button onclick="abrirAyuda()">¿Cómo funciona?</button>
+  <br><br>
+  <div class="banner">¡Subila Nacho!</div>
+  <footer class="footer">
+  Desarrollado por Serch + IA para Todo no se puede. <br><br>
+    <b>sergiosainz.proyectos@gmail.com</b>
+</footer>
+</div>
+
+<!-- CARGA -->
+<div id="carga" class="container hidden">
+  <h2 class="neon">Carga de participantes</h2>
+
+  <input type="file" id="fileInput"><br><br>
+
+  <button id="btnWhatsapp">
+  Importar WhatsApp
+</button>
+
+<input
+  type="file"
+  id="archivoWhatsapp"
+  accept=".txt,.zip"
+  style="display:none;"
+>
+
+  <input id="numeroInput" maxlength="3" placeholder="000">
+  <button id="btnAgregar" onclick="agregarNumero()">Agregar</button>
+
+  <p id="contador"></p>
+  <p id="porcentaje"></p>
+  <p id="dup"></p>
+
+  <button onclick="finalizar()">Finalizar sorteo</button>
+  <footer class="footer">
+  Desarrollado por Serch + IA para Todo no se puede. <br><br>
+    <b>sergiosainz.proyectos@gmail.com</b>
+</footer>
+</div>
+
+<!-- SORTEO -->
+<div id="sorteo" class="container hidden">
+  <h2 class="neon">La Quiniela Solidaria</h2>
+
+  <div id="info"></div>
+
+  <div>
+    <div class="slot" id="s0">?</div>
+    <div class="slot" id="s1">?</div>
+    <div class="slot" id="s2">?</div>
+  </div>
+
+  <button id="b0" onclick="tirar(0)">Centena</button>
+  <button id="b1" onclick="tirar(1)">Decena</button>
+  <button id="b2" onclick="tirar(2)">Unidad</button>
+
+  <p id="posibles"></p>
+
+<button
+  id="saleOSaleBtn"
+  class="hidden"
+  onclick="saleOSale()">
+  Sale o sale
+</button>
+
+<button
+  id="cercaniaBtn"
+  class="hidden"
+  onclick="mostrarCercania()">
+  Ganador por cercanía
+</button>
+  <div id="resultadoBox" class="resultado-box hidden">
+  <h2 id="resultado"></h2>
+</div>
+
+  <button onclick="agregarDesdeSorteo()">Agregar un nuevo número</button>
+ <button onclick="abrirPopup()">Ver números cargados</button>
+  <button onclick="volver()">Volver al inicio</button>
+  <footer class="footer">
+  Desarrollado por Serch + IA para Todo no se puede. <br><br>
+    <b>sergiosainz.proyectos@gmail.com</b>
+</footer>
+</div>
+
+
+  <div id="popup" class="popup hidden">
+
+  <div class="popup-content">
+
+    <h3 class="neon">Números cargados</h3>
+
+    <p id="popupStats"></p>
+
+    <div id="listaNumeros" class="lista"></div>
+
+    <button onclick="cerrarPopup()">
+      Cerrar
+    </button>
+
+  </div>
+
+</div>
+
+
+<!-- POPUP GANADOR POR CERCANIA -->
+<div id="cercaniaPopup" class="popup hidden">
+
+  <div class="popup-content">
+
+    <h3 class="neon">
+      Ganador por cercanía
+    </h3>
+
+    <div id="cercaniaContenido"></div>
+
+    <button onclick="cerrarCercania()">
+      Cerrar
+    </button>
+
+  </div>
+
+</div>
+
+  
+
+<script>
+let numeros = [];
+let duplicados = 0;
+let resultado = ["?","?","?"];
+
+/* MUSICA PERSISTENTE */
+let isPlaying = localStorage.getItem("music") === "on";
+const music = document.getElementById("music");
+const btn = document.getElementById("musicBtn");
+
+if (isPlaying) {
+  music.play().catch(()=>{});
+  btn.textContent="🎵";
+}
+
+btn.onclick = () => {
+  isPlaying = !isPlaying;
+  localStorage.setItem("music", isPlaying ? "on" : "off");
+  if (isPlaying) { music.play().catch(()=>{}); btn.textContent="🎵"; }
+  else { music.pause(); btn.textContent="🔇"; }
+};
+
+/* NAV */
+
+document
+  .getElementById("btnWhatsapp")
+  .addEventListener("click", () => {
+
+    document
+      .getElementById("archivoWhatsapp")
+      .click();
+
+});
+  
+function irCarga(){
+  home.classList.add("hidden");
+  carga.classList.remove("hidden");
+  numeroInput.focus();
+}
+
+/* FINALIZAR */
+function finalizar(){
+  if(!numeros.length){
+    alert("Debe cargar al menos un número válido.");
+    return;
+  }
+
+  if(!confirm("¿Está seguro que desea finalizar la carga?")) return;
+
+  carga.classList.add("hidden");
+  sorteo.classList.remove("hidden");
+
+  info.innerHTML = `
+    Participación: ${(numeros.length/1000*100).toFixed(1)}%<br>
+    Duplicados: ${duplicados}
+  `;
+}
+
+/* INPUT UX */
+numeroInput.addEventListener("input",()=>{
+  if(numeroInput.value.length===3) btnAgregar.focus();
+});
+numeroInput.addEventListener("keydown",e=>{
+  if(e.key==="Enter") agregarNumero();
+});
+
+/* CARGA */
+function agregarNumero(){
+  let n = numeroInput.value;
+
+  if(!/^\d{3}$/.test(n)){
+    alert("El número debe tener exactamente 3 dígitos numéricos.");
+    return;
+  }
+
+  if(numeros.includes(n)) duplicados++;
+
+  numeros.push(n);
+  numeroInput.value="";
+  numeroInput.focus();
+  actualizar();
+}
+
+document
+  .getElementById("archivoWhatsapp")
+  .addEventListener("change", manejarArchivoWhatsapp);
+  
+/* EXCEL VALIDACION FUERTE */
+fileInput.addEventListener("change",e=>{
+  let f = e.target.files[0];
+
+if (f.name.toLowerCase() !== "sorteo.xlsx") {
+  alert("El archivo debe llamarse exactamente 'sorteo.xlsx'.");
+  return;
+}
+
+ if (!f.name.toLowerCase().endsWith(".xlsx")) {
+  alert("El archivo debe ser formato .xlsx.");
+  return;
+}
+
+  let reader=new FileReader();
+  reader.onload=evt=>{
+    let wb=XLSX.read(evt.target.result,{type:"array"});
+    let rows=XLSX.utils.sheet_to_json(
+      wb.Sheets[wb.SheetNames[0]],{header:1}
+    );
+
+    let errores=[];
+
+    rows.forEach((r,i)=>{
+      let val = r[0];
+
+// convertir a string y completar con ceros a la izquierda
+val = String(val).padStart(3, "0");
+
+if(!/^\d{3}$/.test(val)){
+  errores.push(`Fila ${i+1}: valor inválido (${r[0]})`);
+  return;
+}
+      if(numeros.includes(val)) duplicados++;
+      numeros.push(val);
+    });
+
+    if(errores.length){
+      alert("Errores detectados:\n"+errores.slice(0,5).join("\n"));
+    }
+
+    actualizar();
+  };
+  reader.readAsArrayBuffer(f);
+});
+
+async function manejarArchivoWhatsapp(event) {
+
+  const file = event.target.files[0];
+
+  if (!file) return;
+
+  const extension = file.name
+    .split(".")
+    .pop()
+    .toLowerCase();
+
+  let texto = "";
+
+  // TXT
+  if (extension === "txt") {
+
+    texto = await file.text();
+
+  }
+
+  // ZIP
+  else if (extension === "zip") {
+
+    const zip = await JSZip.loadAsync(file);
+
+    const txtFile = Object.keys(zip.files)
+      .find(nombre => nombre.endsWith(".txt"));
+
+    if (!txtFile) {
+
+      alert("No se encontró archivo TXT dentro del ZIP");
+      return;
+
+    }
+
+    texto = await zip
+      .files[txtFile]
+      .async("string");
+
+  }
+
+  else {
+
+    alert("Formato no compatible");
+    return;
+
+  }
+
+  procesarChatWhatsapp(texto);
+
+}
+
+function procesarChatWhatsapp(texto) {
+
+  const lineas = texto.split("\n");
+
+  const hoy = new Date();
+
+  const diaHoy = hoy.getDate();
+  const mesHoy = hoy.getMonth() + 1;
+  const añoHoy = hoy.getFullYear() % 100;
+
+  const numerosValidos = [];
+
+  lineas.forEach(linea => {
+
+    // limpiar caracteres invisibles
+    linea = linea.replace(/\u200e/g, "").trim();
+
+    /*
+      Formato real WhatsApp:
+      [14/5/26, 11:28:53 a. m.] Nombre: 375
+    */
+
+    const match = linea.match(
+      /^\[(\d{1,2})\/(\d{1,2})\/(\d{2}),.*?\]\s.*?:\s(.+)$/
+    );
+
+    if (!match) return;
+
+    const dia = parseInt(match[1]);
+    const mes = parseInt(match[2]);
+    const año = parseInt(match[3]);
+
+    const mensaje = match[4].trim();
+
+    // validar fecha actual
+    if (
+      dia !== diaHoy ||
+      mes !== mesHoy ||
+      año !== añoHoy
+    ) {
+      return;
+    }
+
+    // SOLO mensajes de exactamente 3 dígitos
+    if (/^\d{3}$/.test(mensaje)) {
+
+      if (numeros.includes(mensaje)) {
+        duplicados++;
+      }
+
+      numeros.push(mensaje);
+
+      numerosValidos.push(mensaje);
+
+    }
+
+  });
+
+  actualizar();
+
+  alert(
+    `${numerosValidos.length} números encontrados`
+  );
+
+}
+  
+/* STATS */
+function actualizar(){
+  contador.innerText=`${numeros.length} / 999 cargados`;
+  porcentaje.innerText=`${((numeros.length/999)*100).toFixed(1)}%`;
+  dup.innerText=`Duplicados: ${duplicados}`;
+}
+
+/* SORTEO */
+function tirar(pos){
+  if(resultado[pos]!=="?") return;
+
+  let slot=document.getElementById("s"+pos);
+  slot.classList.add("spin");
+
+  let n=Math.floor(Math.random()*10);
+
+  setTimeout(()=>{
+    slot.textContent=n;
+    resultado[pos]=n;
+    document.getElementById("b"+pos).disabled=true;
+
+    mostrarPosibles(pos);
+
+    if(!resultado.includes("?")) checkGanador();
+  },300);
+}
+
+/* POSIBLES */
+function mostrarPosibles(pos){
+  let filtrados=numeros;
+
+  if(resultado[0]!=="?")
+    filtrados=filtrados.filter(n=>n[0]==resultado[0]);
+
+  if(resultado[1]!=="?")
+    filtrados=filtrados.filter(n=>n[1]==resultado[1]);
+
+  let set=new Set();
+
+  if(pos===0){
+    filtrados.forEach(n=>set.add(n[1]));
+    posibles.innerText=set.size
+      ? "Posibles decena: "+[...set].sort().join(", ")
+      : "No hay combinaciones posibles";
+  }
+
+  if(pos===1){
+    filtrados.forEach(n=>set.add(n[2]));
+    posibles.innerText=set.size
+      ? "Posibles unidad: "+[...set].sort().join(", ")
+      : "No hay combinaciones posibles";
+  }
+}
+
+/* RESULTADO */
+function checkGanador(){
+
+  let num = resultado.join("");
+  let ganadores = numeros.filter(n => n === num);
+
+  const box = document.getElementById("resultadoBox");
+  const res = document.getElementById("resultado");
+  const saleBtn =
+    document.getElementById("saleOSaleBtn");
+  const cercaniaBtn =
+  document.getElementById("cercaniaBtn");
+
+  box.classList.remove(
+    "hidden",
+    "ganador",
+    "sin-ganador"
+  );
+
+  if(ganadores.length > 0){
+
+    // ocultar Sale o sale
+    saleBtn.classList.add("hidden");
+cercaniaBtn.classList.add("hidden");
+
+    if(ganadores.length === 1){
+      res.innerText = "🎉 Hay 1 ganador 🎉";
+    } else {
+      res.innerText =
+        `🎉 Tenemos ${ganadores.length} ganadores 🎉`;
+    }
+
+    box.classList.add("ganador");
+    document.body.classList.add("win");
+
+  } else {
+
+    res.innerText = "Hoy no hay premio";
+
+    box.classList.add("sin-ganador");
+
+    // mostrar Sale o sale
+    saleBtn.classList.remove("hidden");
+cercaniaBtn.classList.remove("hidden");
+  }
+}
+
+/* AGREGAR DESDE SORTEO */
+function agregarDesdeSorteo(){
+
+  // si ya salió la centena
+  if(resultado[0] !== "?"){
+    alert("No se pueden agregar números una vez sorteada la centena.");
+    return;
+  }
+
+  let nuevo = prompt("Ingrese número de 3 cifras:");
+
+  if(!/^\d{3}$/.test(nuevo)){
+    alert("Número inválido.");
+    return;
+  }
+
+  if(numeros.includes(nuevo)) duplicados++;
+
+  numeros.push(nuevo);
+
+  actualizar();
+}
+
+/* RESET */
+function volver(){
+  if(resultado.includes("?")){
+    alert("Debe completar el sorteo antes de salir.");
+    return;
+  }
+  location.reload();
+}
+
+/* PWA */
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("sw.js");
+}
+
+function abrirPopup() {
+  const popup = document.getElementById("popup");
+  const lista = document.getElementById("listaNumeros");
+  const stats = document.getElementById("popupStats");
+
+  lista.innerHTML = "";
+
+  // stats
+  stats.innerText =
+    `Total: ${numeros.length} | Duplicados: ${duplicados}`;
+
+  // lista de números
+  [...numeros]
+  .sort((a, b) => Number(a) - Number(b))
+  .forEach(n => {
+
+    const div = document.createElement("div");
+    div.textContent = n;
+    lista.appendChild(div);
+
+  });
+
+  popup.classList.remove("hidden");
+}
+
+function cerrarPopup() {
+  document.getElementById("popup").classList.add("hidden");
+}
+
+function abrirAyuda() {
+  document.getElementById("ayudaPopup")
+    .classList.remove("hidden");
+}
+
+function cerrarAyuda() {
+
+  document
+    .getElementById("ayudaPopup")
+    .classList.add("hidden");
+}
+  
+
+function saleOSale(){
+
+  // resetear resultado
+  resultado = ["?","?","?"];
+
+  // volver slots a ?
+  document.getElementById("s0").textContent = "?";
+  document.getElementById("s1").textContent = "?";
+  document.getElementById("s2").textContent = "?";
+
+  // reactivar botones
+  document.getElementById("b0").disabled = false;
+  document.getElementById("b1").disabled = false;
+  document.getElementById("b2").disabled = false;
+
+  // limpiar posibles
+  document.getElementById("posibles").innerText = "";
+
+  // ocultar resultado
+  const box =
+    document.getElementById("resultadoBox");
+
+  box.classList.add("hidden");
+  box.classList.remove(
+    "ganador",
+    "sin-ganador"
+  );
+
+  // sacar efecto ganador
+  document.body.classList.remove("win");
+
+  // ocultar botón otra vez
+  document
+    .getElementById("saleOSaleBtn")
+    .classList.add("hidden");
+
+  document
+  .getElementById("cercaniaBtn")
+  .classList.add("hidden");
+}
+
+function mostrarCercania(){
+
+  const numSorteado = Number(resultado.join(""));
+
+  // calcular distancia mínima
+  let distanciaMinima = Infinity;
+
+  numeros.forEach(n => {
+
+    const distancia =
+      Math.abs(Number(n) - numSorteado);
+
+    if(distancia < distanciaMinima){
+      distanciaMinima = distancia;
+    }
+  });
+
+  // obtener más cercanos
+  const cercanos = numeros.filter(n =>
+    Math.abs(Number(n) - numSorteado)
+    === distanciaMinima
+  );
+
+  // ordenar de menor a mayor
+  const ordenados = [...numeros]
+    .sort((a,b)=>Number(a)-Number(b));
+
+  // generar html
+  let html = `
+    <p>
+      Número sorteado:
+      <b>${resultado.join("")}</b>
+    </p>
+
+    <p>
+      Ganador${cercanos.length > 1 ? "es" : ""}
+      por cercanía:
+    </p>
+  `;
+
+  cercanos.forEach(n => {
+    html += `<div>${n}</div>`;
+  });
+
+  html += `
+    <hr>
+
+    <p><b>Números cargados</b></p>
+  `;
+
+  ordenados.forEach(n => {
+    html += `<div>${n}</div>`;
+  });
+
+  document
+    .getElementById("cercaniaContenido")
+    .innerHTML = html;
+
+  document
+    .getElementById("cercaniaPopup")
+    .classList.remove("hidden");
+}
+
+function cerrarCercania(){
+
+  document
+    .getElementById("cercaniaPopup")
+    .classList.add("hidden");
+}
+  
+</script>
+
+</body>
+</html>
